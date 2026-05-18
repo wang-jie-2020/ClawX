@@ -1,0 +1,34 @@
+Generated: 2026-05-12
+Scope: initial codemap generation
+
+1) Files added/removed/modified since last scan
+- Previous codemaps: none found in docs/CODEMAPS or .reports/codemaps
+- Added:
+  - docs/CODEMAPS/architecture.md
+  - docs/CODEMAPS/backend.md
+  - docs/CODEMAPS/frontend.md
+  - docs/CODEMAPS/data.md
+  - docs/CODEMAPS/dependencies.md
+- Modified: none (initial write)
+- Removed: none
+
+2) New dependencies detected
+- Not applicable (initial baseline generation).
+- Snapshot includes key runtime/integration deps:
+  - electron, openclaw, ws, electron-store, electron-updater, posthog-node
+  - multi-provider registry and channel/plugin integrations
+
+3) Architecture changes (new routes/services/etc.)
+- Not applicable as delta (no prior baseline for comparison).
+- Baseline captured:
+  - Host API route families (/api/settings, /api/provider-accounts, /api/channels, /api/cron, /api/sessions, /api/clawhub)
+  - Main-process orchestration around GatewayManager and HostEventBus
+  - Renderer state topology via Zustand stores (chat/gateway/providers/settings/channels)
+
+4) Staleness warnings for docs not updated in 90+ days
+- None (newly generated today).
+
+5) Diff percentage
+- Previous codemap baseline missing -> treated as initial snapshot.
+- Diff calculation: N/A
+- 30% overwrite approval gate: skipped (no previous files to overwrite).
