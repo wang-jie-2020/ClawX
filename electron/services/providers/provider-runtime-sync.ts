@@ -5,6 +5,7 @@ import type { ProviderConfig } from '../../utils/secure-storage';
 import { getAllProviders, getApiKey, getDefaultProvider, getProvider } from '../../utils/secure-storage';
 import { getProviderConfig, getProviderDefaultModel } from '../../utils/provider-registry';
 import {
+  ensureAnthropicMessagesModelMaxTokens,
   ensureOpenClawProviderAgentRuntimePins,
   pruneInvalidApiProviderEntries,
   removeProviderFromOpenClaw,
@@ -607,14 +608,10 @@ export async function syncDefaultProviderToRuntime(
     logger.warn('[provider-runtime] Failed to prune invalid provider entries before switch:', err);
   }
 
-  // Self-heal: pin the embedded agent runtime for any legacy provider entry
-  // that needs it (currently only `openai`, which would otherwise be auto-
-  // routed by OpenClaw to the unbundled `codex` harness when configured with
-  // the official api.openai.com baseUrl). Earlier ClawX builds wrote the
-  // provider entry without `agentRuntime`, so upgrading users would keep
-  // hitting `Requested agent harness "codex" is not registered.` until they
-  // re-saved the provider manually. Running this before every default-
-  // provider switch repairs the on-disk config on the next save.
+  // Self-heal: pin the embedded agent runtime for legacy OpenAI provider entries
+  // (`openai`, `openai-codex`) that would otherwise be auto-routed to the
+  // unbundled `codex` harness. Running this before every default-provider switch
+  // repairs on-disk config written by earlier ClawX builds.
   try {
     const pinned = await ensureOpenClawProviderAgentRuntimePins();
     if (pinned.length > 0) {
@@ -624,6 +621,17 @@ export async function syncDefaultProviderToRuntime(
     }
   } catch (err) {
     logger.warn('[provider-runtime] Failed to pin embedded agent runtime for provider entries before switch:', err);
+  }
+
+  try {
+    const healed = await ensureAnthropicMessagesModelMaxTokens();
+    if (healed.length > 0) {
+      logger.warn(
+        `[provider-runtime] Ensured anthropic-messages maxTokens for models.providers entries before switch: ${healed.join(', ')}`,
+      );
+    }
+  } catch (err) {
+    logger.warn('[provider-runtime] Failed to ensure anthropic-messages maxTokens before switch:', err);
   }
 
   const ock = await resolveRuntimeProviderKey(provider);
