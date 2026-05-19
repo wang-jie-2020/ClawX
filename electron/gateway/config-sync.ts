@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync, symlinkSync } from 'fs';
 import { homedir } from 'os';
+import { execFileSync } from 'child_process';
 import { join } from 'path';
 
 function fsPath(filePath: string): string {
@@ -252,6 +253,40 @@ function buildPluginSourceSignatures(configuredChannels: string[]): Record<strin
       : 'missing';
   }
   return signatures;
+}
+
+/**
+ * Find npm executable directory on Windows so that OpenClaw's acpx plugin
+ * can resolve it for runtime dependency installation.
+ * On non-Windows platforms this is rarely needed (npm is typically in PATH).
+ */
+function findNpmBinDir(): string | null {
+  if (process.platform !== 'win32') return null;
+  try {
+    // Use 'where' on Windows to find npm; parse first result's directory.
+    const output = execFileSync('where', ['npm'], { encoding: 'utf-8', timeout: 3000 }).trim();
+    const firstLine = output.split(/\r?\n/)[0];
+    if (firstLine) {
+      return path.dirname(firstLine);
+    }
+  } catch {
+    // 'where' may fail or not be available — try common Volta/pnpm locations.
+  }
+  // Fallback: check common install locations.
+  const candidates = [
+    join(process.env.LOCALAPPDATA || '', 'Volta'),           // Volta shims
+    join(process.env.APPDATA || '', 'npm'),                  // global npm
+    path.join(process.env.ProgramFiles || '', 'nodejs'),     // official installer
+    path.join(process.env['ProgramFiles(x86)'] || '', 'nodejs'),
+  ];
+  for (const dir of candidates) {
+    try {
+      if (existsSync(fsPath(join(dir, 'npm.cmd'))) || existsSync(fsPath(join(dir, 'npm')))) {
+        return dir;
+      }
+    } catch { /* skip */ }
+  }
+  return null;
 }
 
 function buildPluginMaintenanceCacheKey(openclawDir: string, configuredChannels: string[]): string {
@@ -596,11 +631,23 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
 
   const { NODE_OPTIONS: _nodeOptions, ...baseEnv } = process.env;
   const baseEnvRecord = baseEnv as Record<string, string | undefined>;
-  const baseEnvPatched = binPathExists
+  let envWithBin = binPathExists
     ? prependPathEntry(baseEnvRecord, binPath).env
     : baseEnvRecord;
+
+  // On Windows, ensure the Gateway child process can find npm.
+  // The acpx built-in extension needs npm to install its runtime dependencies,
+  // and Volta-managed npm may not be in the inherited PATH of Electron subprocesses.
+  const npmDir = findNpmBinDir();
+  if (npmDir) {
+    envWithBin = prependPathEntry(envWithBin, npmDir).env;
+    logger.info(`Prepended npm bin directory to Gateway PATH: ${npmDir}`);
+  } else {
+    logger.warn('Could not locate npm directory; acpx plugin may fail to resolve runtime deps');
+  }
+
   const forkEnv: Record<string, string | undefined> = {
-    ...stripSystemdSupervisorEnv(baseEnvPatched),
+    ...stripSystemdSupervisorEnv(envWithBin),
     ...providerEnv,
     ...uvEnv,
     ...proxyEnv,
