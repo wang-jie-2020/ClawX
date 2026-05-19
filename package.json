@@ -33,7 +33,7 @@
     "scripts": {
         "postinstall": "node scripts/patch-browser-hint.mjs",
         "init": "pnpm install && pnpm run uv:download",
-        "predev": "node scripts/generate-ext-bridge.mjs && zx scripts/prepare-preinstalled-skills-dev.mjs",
+        "predev": "node scripts/generate-ext-bridge.mjs && node scripts/prepare-preinstalled-skills-dev.mjs",
         "dev": "vite",
         "ext:bridge": "node scripts/generate-ext-bridge.mjs",
         "build": "node scripts/generate-ext-bridge.mjs && pnpm run build:vite && zx scripts/bundle-openclaw.mjs && zx scripts/bundle-openclaw-plugins.mjs && zx scripts/bundle-preinstalled-skills.mjs && node scripts/run-electron-builder.mjs",
